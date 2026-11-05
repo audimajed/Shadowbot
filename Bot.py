@@ -1,6 +1,9 @@
 import logging
 import time
 import aiohttp
+import os
+import threading
+from flask import Flask
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -10,6 +13,18 @@ from telegram.ext import (
 from config import BOT_TOKEN, ADMIN_ID, BOT_NAME
 import database as db
 
+# ===== إعدادات Flask لـ Render =====
+web_app = Flask(__name__)
+
+@web_app.route('/')
+def home():
+    return "مبرمج الظل يعمل!"
+
+def run_flask():
+    port = int(os.environ.get('PORT', 8080))
+    web_app.run(host='0.0.0.0', port=port)
+
+# ===== إعدادات البوت =====
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger("ShadowBot")
 
@@ -253,10 +268,10 @@ async def echo(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     db.log_action(u.id, "message", update.message.text[:50])
     await update.message.reply_text(f"🖤 سمعتك: «{update.message.text}»")
 
-# ===== main =====
-def main():
-    if not BOT_TOKEN or BOT_TOKEN == "ضع_التوكن_الجديد_هنا":
-        print("❌ ضع التوكن في .env أولاً.")
+# ===== دالة التشغيل الأساسية =====
+def run_bot():
+    if not BOT_TOKEN:
+        print("❌ ضع التوكن في Environment Variables أولاً.")
         return
     db.init_db()
     app = Application.builder().token(BOT_TOKEN).build()
@@ -282,5 +297,11 @@ def main():
     logger.info(f"🖤 {BOT_NAME} يعمل...")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
+# ===== نقطة البداية =====
 if __name__ == "__main__":
-    main()
+    # تشغيل البوت في Thread منفصل عشان Flask يشتغل في الخلفية
+    t = threading.Thread(target=run_bot)
+    t.start()
+    
+    # تشغيل Flask عشان Render ميقفلش الخدمة
+    run_flask()
